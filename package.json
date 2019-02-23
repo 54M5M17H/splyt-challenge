@@ -1,0 +1,22 @@
+{
+	"name": "splyt-challenge",
+	"version": "1.0.0",
+	"description": "Splyt challenge",
+	"scripts": {
+		"build": "tsc -p ./tsconfig.json",
+		"pretest": "npm run build",
+		"test": "mocha --opts ./test/mocha.opts --exit",
+		"lint": "tslint -t stylish --project \"tsconfig.json\""
+	},
+	"author": "Sam Smith (iamsamsmith.co)",
+	"license": "ISC",
+	"devDependencies": {
+		"@types/mocha": "5.2.6",
+		"mocha": "5.2.0",
+		"should": "13.2.3",
+		"ts-node": "4.1.0",
+		"tslint": "5.9.1",
+		"tslint-config-airbnb": "5.5.0",
+		"typescript": "2.6.2"
+	}
+}
