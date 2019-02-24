@@ -1,4 +1,4 @@
-import { addMinutes, isHowManyMinsBehind } from '../lib/string.patch';
+import { addMinutes, isBefore } from '../lib/string.patch';
 
 // CONSTANTS
 const START_TIME = '09:00';
@@ -11,6 +11,7 @@ export default class Scheduler {
 	private _potentialStartTime: string;
 	private potentialMeetingEnd: string;
 	private personPointers: TSchedulePointers;
+	private slotHasMoved: boolean = false;
 
 	constructor(schedules: TStaffSchedule, meetingLength: number) {
 		Object.assign(this, { schedules, meetingLength });
@@ -19,12 +20,17 @@ export default class Scheduler {
 	}
 
 	set potentialStartTime(newValue: string) {
+		if (this._potentialStartTime && !this._potentialStartTime[isBefore](newValue)) {
+			return;
+		}
+
 		this.potentialMeetingEnd = newValue[addMinutes](this.meetingLength);
-		const exceedsWorkingDay = this.potentialMeetingEnd[isHowManyMinsBehind](END_TIME) <= 0;
-		if (exceedsWorkingDay) {
+		const fitsIntoWorkingDay = this.potentialMeetingEnd[isBefore](END_TIME);
+		if (!fitsIntoWorkingDay) {
 			throw new Error('No time left in day for meeting');
 		}
 		this._potentialStartTime = newValue;
+		this.slotHasMoved = true;
 	}
 
 	get potentialStartTime(): string {
@@ -33,14 +39,23 @@ export default class Scheduler {
 
 	public exec(): TMeeting {
 		try {
-			// find first person's next free slot
-			this.findIndividualsNextFreeSlot(0);
+			let canMakeItTracker = 0;
+			let currentPersonIndex = 0;
 
-			// check whether others can make it
-			const allCanMake = this.personPointers.slice(1).every((_, index) => this.findIndividualsNextFreeSlot(index + 1));
-			if (!allCanMake) {
-				return this.exec();
+			// until all have been checked against current time
+			while (canMakeItTracker < this.schedules.length) {
+				this.findIndividualsNextFreeSlot(currentPersonIndex);
+				if (this.slotHasMoved) {
+					this.slotHasMoved = false;
+					// reset
+					canMakeItTracker = 1;
+				} else {
+					canMakeItTracker++;
+				}
+				// wrap around
+				currentPersonIndex = (currentPersonIndex + 1) % this.schedules.length;
 			}
+
 			return [this.potentialStartTime, this.potentialMeetingEnd];
 		} catch (error) {
 			if (error.message === 'No time left in day for meeting') {
@@ -51,18 +66,28 @@ export default class Scheduler {
 		}
 	}
 
-	private findIndividualsNextFreeSlot(personIndex: number): boolean {
+	private findIndividualsNextFreeSlot(personIndex: number): void {
 		const pointer = this.personPointers[personIndex];
-		const nextMeeting = this.schedules[personIndex][pointer];
-		const overlap = nextMeeting[0][isHowManyMinsBehind](this.potentialMeetingEnd);
-		if (overlap > 0) {
-			this.potentialStartTime = nextMeeting[1];
-			this.personPointers[personIndex]++;
-			if (personIndex === 0) {
-				return this.findIndividualsNextFreeSlot(personIndex);
-			}
-			return false;
+
+		const nextAvailableTime = (pointer > 0) ?
+			this.schedules[personIndex][pointer - 1][1] : START_TIME;
+
+		const mustStartLater = this.potentialStartTime[isBefore](nextAvailableTime);
+		if (mustStartLater) {
+			return this.slideStartForward(personIndex, nextAvailableTime);
 		}
-		return true;
+
+		const [nextMeetingStart, nextMeetingEnd] = this.schedules[personIndex][pointer];
+
+		const endsTooLate = nextMeetingStart[isBefore](this.potentialMeetingEnd);
+		if (endsTooLate) {
+			return this.slideStartForward(personIndex, nextMeetingEnd);
+		}
+	}
+
+	private slideStartForward(personIndex: number, newStartTime: string): void {
+		this.potentialStartTime = newStartTime;
+		this.personPointers[personIndex]++;
+		return this.findIndividualsNextFreeSlot(personIndex);
 	}
 }

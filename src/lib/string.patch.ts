@@ -3,6 +3,7 @@
 
 export const addMinutes = Symbol();
 export const isHowManyMinsBehind = Symbol();
+export const isBefore = Symbol();
 
 // NON-mutating
 String.prototype[addMinutes] = function (additionalMinutes: number): string {
@@ -20,4 +21,8 @@ String.prototype[isHowManyMinsBehind] = function (futureTime: string): number {
 	const [futureHours, futureMinutes] = futureTime.split(':');
 	return ((Number(futureHours)  * 60) + Number(futureMinutes)) -
 		(Number(currentHours * 60) + Number(currentMinutes));
+};
+
+String.prototype[isBefore] = function (comparsionTime: string): boolean {
+	return this[isHowManyMinsBehind](comparsionTime) > 0;
 };

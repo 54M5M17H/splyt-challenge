@@ -1,4 +1,4 @@
 // setup for tests
 import 'should';
 
-console.log('Tests start:')
+console.log('Tests start:');
